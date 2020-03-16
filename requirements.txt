@@ -5,7 +5,7 @@ moviepy<1.0.0
 numpy
 opencv-python
 pims
-PyOpenGL
+PyOpenGL==3.1.0
 pyquaternion
 pyyaml
 recordclass

@@ -236,11 +236,15 @@ def check_inliers_mask(inliers_mask: np.ndarray,
             inlier_ratio >= min_inlier_ratio)
 
 
-def check_baseline(view_mat_1: np.ndarray, view_mat_2: np.ndarray,
-                   min_distance: float) -> bool:
+def get_baseline(view_mat_1: np.ndarray, view_mat_2: np.ndarray) -> float:
     camera_center_1 = to_camera_center(view_mat_1)
     camera_center_2 = to_camera_center(view_mat_2)
-    distance = np.linalg.norm(camera_center_2 - camera_center_1)
+    return np.linalg.norm(camera_center_2 - camera_center_1)
+
+
+def check_baseline(view_mat_1: np.ndarray, view_mat_2: np.ndarray,
+                   min_distance: float) -> bool:
+    distance = get_baseline(view_mat_1, view_mat_2)
     return distance >= min_distance
 
 
