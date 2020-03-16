@@ -40,9 +40,9 @@ class CameraTracker:
         view_matr_1 = pose_to_view_mat3x4(known_view_1[1])
         view_matr_2 = pose_to_view_mat3x4(known_view_2[1])
 
-        self.tracked_poses = [eye3x4()] * len(self.corner_storage)
-        self.tracked_poses[frame_num_1] = view_matr_1
-        self.tracked_poses[frame_num_2] = view_matr_2
+        self.tracked_views = [eye3x4()] * len(self.corner_storage)
+        self.tracked_views[frame_num_1] = view_matr_1
+        self.tracked_views[frame_num_2] = view_matr_2
         self.initial_baseline = get_baseline(view_matr_1, view_matr_2)
         print(self.initial_baseline)
 
@@ -109,23 +109,29 @@ class CameraTracker:
         if len(correspondences.ids) > 0:
             max_reproj_error = 1.0
             min_angle = 1.0
-            view_1 = self.tracked_poses[frame_num_1]
-            view_2 = self.tracked_poses[frame_num_2]
+            view_1 = self.tracked_views[frame_num_1]
+            view_2 = self.tracked_views[frame_num_2]
             triangulation_params = TriangulationParameters(max_reproj_error, min_angle, 0)
             pts_3d, triangulated_ids, med_cos = triangulate_correspondences(correspondences, view_1,
                                                                             view_2, self.intrinsic_mat,
                                                                             triangulation_params)
-
             if initial_triangulation:
-                while len(pts_3d) < 8 and len(correspondences.ids) > 7:
+                num_iter = 0
+                while len(pts_3d) < 8 and len(correspondences.ids) > 7 and num_iter < 100:
                     max_reproj_error *= 1.2
                     min_angle *= 0.8
                     triangulation_params = TriangulationParameters(max_reproj_error, min_angle, 0)
                     pts_3d, triangulated_ids, med_cos = triangulate_correspondences(correspondences, view_1,
                                                                                     view_2, self.intrinsic_mat,
                                                                                     triangulation_params)
+                    num_iter += 1
+
+                if num_iter >= 100 and len(pts_3d) < 4:
+                    raise TrackingError('Failed to triangulate enough points')
             print('added', len(pts_3d), 'points')
             self.pc_builder.add_points(triangulated_ids, pts_3d)
+        elif initial_triangulation:
+            raise TrackingError('Not found correspondences on image pair')
 
     def track(self):
         curr_frame = self.min_init_frame + 1
@@ -138,7 +144,7 @@ class CameraTracker:
                 self.outliers = set()
             print(curr_frame)
             try:
-                self.tracked_poses[curr_frame] = self._get_pos(curr_frame)
+                self.tracked_views[curr_frame] = self._get_pos(curr_frame)
             except TrackingError as error:
                 print(error)
                 print('Stopping tracking')
@@ -150,7 +156,7 @@ class CameraTracker:
                     curr_frame - prev_curr_diff if curr_frame > self.min_init_frame else curr_frame + prev_curr_diff
                 prev_curr_diff += 1
                 if prev_frame < seq_size and (self.min_init_frame <= prev_frame or curr_frame < self.min_init_frame):
-                    if check_baseline(self.tracked_poses[prev_frame], self.tracked_poses[curr_frame],
+                    if check_baseline(self.tracked_views[prev_frame], self.tracked_views[curr_frame],
                                       self.initial_baseline * 0.15):
                         self._add_points_from_frame(prev_frame, curr_frame)
                         num_pairs += 1
@@ -161,7 +167,11 @@ class CameraTracker:
             else:
                 curr_frame -= 1
 
-        return self.tracked_poses, self.pc_builder
+        return self.tracked_views, self.pc_builder
+
+
+def _find_pos_pair():
+    pass
 
 
 def track_and_calc_colors(camera_parameters: CameraParameters,
@@ -180,8 +190,13 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
     )
 
     # TODO: implement
-    tracker = CameraTracker(intrinsic_mat, corner_storage, known_view_1, known_view_2)
-    view_mats, point_cloud_builder = tracker.track()
+    try:
+        tracker = CameraTracker(intrinsic_mat, corner_storage, known_view_1, known_view_2)
+        view_mats, point_cloud_builder = tracker.track()
+    except TrackingError as error:
+        print(error)
+        print('Poses and point cloud are not calculated')
+        view_mats, point_cloud_builder = [eye3x4()] * len(corner_storage), PointCloudBuilder()
 
     calc_point_cloud_colors(
         point_cloud_builder,

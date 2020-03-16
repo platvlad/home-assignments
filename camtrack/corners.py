@@ -113,6 +113,7 @@ def _build_impl(frame_sequence: pims.FramesSequence,
         image_0 = image_1
 
 
+
 def build(frame_sequence: pims.FramesSequence,
           progress: bool = True) -> CornerStorage:
     """
