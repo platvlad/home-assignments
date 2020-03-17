@@ -132,9 +132,12 @@ class CameraTracker:
                 if num_iter >= 100 and len(pts_3d) < 4:
                     raise TrackingError('Failed to triangulate enough points')
             self.pc_builder.add_points(triangulated_ids, pts_3d)
+
             return len(pts_3d)
         elif initial_triangulation:
             raise TrackingError('Not found correspondences on image pair')
+        else:
+            return 0
 
     def track(self):
         curr_frame = self.min_init_frame + 1
