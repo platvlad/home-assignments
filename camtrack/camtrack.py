@@ -184,7 +184,7 @@ def _test_frame_pair(intrinsic_mat: np.ndarray,
                      corners_2: FrameCorners,
                      param_koeff: float = 1) -> Tuple[int, Optional[Pose]]:
     correspondences = build_correspondences(corners_1, corners_2)
-    if len(correspondences.ids) < 5:
+    if len(correspondences.ids) < 6:
         return 0, None
     points2d_1 = correspondences.points_1
     points2d_2 = correspondences.points_2
@@ -192,6 +192,8 @@ def _test_frame_pair(intrinsic_mat: np.ndarray,
     essential, essential_inliers = cv2.findEssentialMat(points2d_1, points2d_2, intrinsic_mat, threshold=param_koeff)
     homography, homography_inliers = cv2.findHomography(points2d_1, points2d_2, method=cv2.RANSAC)
     if len(np.where(homography_inliers > 0)[0]) > len(np.where(essential_inliers > 0)[0]):
+        return 0, None
+    if essential.shape != (3, 3):
         return 0, None
     num_passed, rot, t, mask = cv2.recoverPose(essential, points2d_1, points2d_2,
                                                intrinsic_mat, mask=essential_inliers)
